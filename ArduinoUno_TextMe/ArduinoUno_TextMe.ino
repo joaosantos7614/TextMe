@@ -6,6 +6,7 @@
 const int rs = 7, en = 6, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 String message;
+String messageAux;
 int totalLines;
 int buttonPressed = 0;
 int currentLine = 0;
@@ -16,16 +17,16 @@ String GetLine(String message, int lineNr = 0){
 }
 
 void DisplayMessage(String message, int lineNr){
-  message = message + "                ";
+  message = message + "                " + "                ";
   lcd.setCursor(0, 0);
   lcd.print(GetLine(message,lineNr));
   lcd.setCursor(0, 1);
   lcd.print(GetLine(message,lineNr+1));
-
 }
 
 // maybe review this so that it will not pause everything...
-void Beep(){   
+void BeepOld(){ //Sadly this one does not work very well...
+  Serial.println("Beep called");   
   tone(8, 1479.98, 175);
   delay(175);
   noTone(8);
@@ -43,8 +44,13 @@ void Beep(){
   noTone(8);
 }
 
+void Beep(){
+  //Serial.println("Beep called");   
+  tone(8, 1479.98, 200);  
+}
+
 void setup() {
-  Wire.begin(9); // 9 is the address of this Arduino as a slave
+  Wire.begin(9); // 9 is the address of this Arduino (slave)
   Wire.onReceive(receiveEvent);
   Serial.begin(9600);
   pinMode(13, OUTPUT); //turn off internal led
@@ -60,36 +66,21 @@ void setup() {
 
 void UpdateCurrentLine(){
   buttonPressed = ReadButtons();
-  totalLines = message.length()/16; //will be rounded down, so the number will indicate the second to last line
   if(buttonPressed==2 && currentLine<totalLines-1){  //increase page number
-    currentLine+=1;
+    currentLine+=2;
     DisplayMessage(message,currentLine);
-    delay(500);
+    delay(500); //to avoid multiple presses
   } else if(buttonPressed==1 && currentLine>0){  //decrease page number
-    currentLine-=1;
+    currentLine-=2;
     DisplayMessage(message,currentLine);
     delay(500);
   }
 }
 
 void loop() {
-  /*
-  check for incoming I2C communication
-    if comunication exists
-      receive char array
-      update message string
-      display line 0
-      call Beep()
-  */
-
   UpdateCurrentLine();
   
-  
 }
-
-
-
-
 
 int ReadButtons(){
   int A0Value = analogRead(A0);
@@ -103,8 +94,20 @@ int ReadButtons(){
 }
 
 void receiveEvent() {
-  while (Wire.available()) {
-    char incomingChar = Wire.read();
-    Serial.print(incomingChar);
+  char c = Wire.read();
+  //Serial.print(c);
+  messageAux+=c;
+  
+  if (messageAux.endsWith("#END#")){
+    message = messageAux.substring(0,messageAux.indexOf("#END#"));
+    messageAux="";
+    //Serial.println("");
+    //Serial.println("String: "+ message);
+    //Serial.println("");
+    buttonPressed = 0;
+    currentLine = 0;
+    totalLines = message.length()/16;
+    DisplayMessage(message,currentLine);
+    Beep();
   }
 }
