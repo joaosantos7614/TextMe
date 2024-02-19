@@ -24,44 +24,68 @@ void DisplayMessage(String message, int lineNr){
   lcd.print(GetLine(message,lineNr+1));
 }
 
-// maybe review this so that it will not pause everything...
-void BeepOld(){ //Sadly this one does not work very well...
-  Serial.println("Beep called");   
-  tone(8, 1479.98, 175);
-  delay(175);
-  noTone(8);
-  delay(175);
-  tone(8, 1479.98, 175);
-  delay(175);
-  noTone(8);
-  delay(600); //
-  tone(8, 1479.98, 175);
-  delay(175);
-  noTone(8);
-  delay(175);
-  tone(8, 1479.98, 175);
-  delay(175);
-  noTone(8);
-}
-
+//200ms tone in F#
 void Beep(){
-  //Serial.println("Beep called");   
-  tone(8, 1479.98, 200);  
+  tone(8, 1479.98, 200);
 }
 
-void setup() {
-  Wire.begin(9); // 9 is the address of this Arduino (slave)
-  Wire.onReceive(receiveEvent);
-  Serial.begin(9600);
-  pinMode(13, OUTPUT); //turn off internal led
-  pinMode(8,OUTPUT); //passive speaker
-  lcd.begin(16, 2);
-  //Beep(); //it was here just to test beeping
+String formatMessage(String inputString) { //turns out this is more difficult than expected and it adds very little to the purpose of the project.
+  String formattedString = inputString.substring(0,16); // this is the part with the name of the sender
+  inputString = inputString.substring(16);  //this is the message itself
+  
+  int lastSpaceIndex = 0;
+  int currentLineIndex = 0;
+  String currentLine = "";
+  
+  //inputString = BreakLargeWords(inputString); disabled, I think this is breaking the ram size
+  
+  for(int i=0;i < inputString.length();i++ ){
+    if((String)inputString[i]==" "){
+      lastSpaceIndex = i;
+      currentLineIndex = currentLine.length();
+    }
+    if(currentLine.length()==15 && (String)inputString[i]==" "){   //line ending with " "
+      currentLine += inputString[i];
+      formattedString += currentLine;
+      currentLine = "";
+    } else if(currentLine.length()==16 && (String)inputString[i]==" "){   //next line starting with " "
+      formattedString += currentLine;
+      currentLine = "";
+    } else if(currentLine.length()<16){  //while there is space in the line, a character will be added
+      currentLine += inputString[i];
+    } else if (currentLine.length()==16) {  //if it reaches this if, means that for sure, a word is broken
+      currentLine = currentLine.substring(0,currentLineIndex);
+      currentLine += "                ";
+      currentLine = currentLine.substring(0,16);
+      formattedString += currentLine;
+      currentLine = "";
+      i = lastSpaceIndex;
+    }
+  }
+  formattedString += currentLine;
+  return formattedString;
+}
 
-  // Print the stanby message to the LCD.
-  message="Waiting for     message...";
-  //message="Things may not have gone as planned last week for the flying cellphone on Mars, but just because Ingenuitys flying career is over doesnt mean theres no more work to do.";
-  DisplayMessage(message,0);
+//this breakes large words, adding spaces
+String BreakLargeWords(String inputString){
+  int nonSpaceCounter = 0;
+  String stringAux = "";
+  for(int i=0;i < inputString.length();i++ ){
+    Serial.println((String)i+" "+(String)nonSpaceCounter);
+    if((String)inputString[i]==" "){
+      nonSpaceCounter = 0;
+    } else { 
+      nonSpaceCounter++;
+    }
+    if(nonSpaceCounter>16){
+      stringAux += (" "+(String)inputString[i]);
+      nonSpaceCounter = 0;
+    } else {
+      stringAux += (String)inputString[i];
+    }
+  }
+  //inputString = stringAux;
+  return stringAux;
 }
 
 void UpdateCurrentLine(){
@@ -77,11 +101,6 @@ void UpdateCurrentLine(){
   }
 }
 
-void loop() {
-  UpdateCurrentLine();
-  
-}
-
 int ReadButtons(){
   int A0Value = analogRead(A0);
   if(A0Value<100){
@@ -95,19 +114,41 @@ int ReadButtons(){
 
 void receiveEvent() {
   char c = Wire.read();
-  //Serial.print(c);
   messageAux+=c;
   
   if (messageAux.endsWith("#END#")){
     message = messageAux.substring(0,messageAux.indexOf("#END#"));
+    Serial.println("");
+    Serial.println(millis()/1000);
+    Serial.println(message);
     messageAux="";
-    //Serial.println("");
-    //Serial.println("String: "+ message);
-    //Serial.println("");
     buttonPressed = 0;
     currentLine = 0;
+    message = formatMessage(message);
     totalLines = message.length()/16;
     DisplayMessage(message,currentLine);
     Beep();
   }
+}
+
+void setup() {
+  Wire.begin(9); // 9 is the address of this Arduino (slave)
+  Wire.onReceive(receiveEvent);
+  Serial.begin(9600);
+  pinMode(13, OUTPUT); //turn off internal led
+  pinMode(8,OUTPUT); //passive speaker
+  lcd.begin(16, 2);
+  //Serial.println("Break test: "+BreakLargeWords("this is me tryingToBreakThisDamnThingIWonderHowMany words are needed"));
+  
+  // Print the stanby message to the LCD.
+  message="Waiting for     message...";
+  //message ="Things may not have gone as planned last week for the flying cellphone on Mars, but just because Ingenuitys flying career is over doesnt mean theres no more work to do.";
+  //message ="Joao:           hello :) Things may not have gone as planned last week for the flying cellphone on Mars";
+  //message = formatMessage(message); 
+  totalLines = message.length()/16;
+  DisplayMessage(message,0);
+}
+
+void loop() {
+  UpdateCurrentLine(); 
 }

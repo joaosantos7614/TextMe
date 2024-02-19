@@ -1,8 +1,8 @@
 #include <Wire.h>
 #include <ESP8266WiFi.h>
 
-const char* ssid = "Ludwig WAN Beethoven";       // Replace with your WiFi network SSID
-const char* password = "AnanasBanana1234"; // Replace with your WiFi network password
+const char* ssid = "router ssid";       // Replace with your WiFi network SSID
+const char* password = "password"; // Replace with your WiFi network password
 WiFiServer server(80);
 unsigned long lastConnectionMillis = 0;
 unsigned long minimumTimeBetweenConnections = 10000; //in miliseconds between client connections
@@ -50,11 +50,12 @@ void loop() {
   // Check if a client has connected
   WiFiClient client = server.available();
   if (client && (millis()-lastConnectionMillis>minimumTimeBetweenConnections||lastConnectionMillis==0)) {
-    
+    message = "";
+    Serial.println("");
     Serial.println("New client connected");
     lastConnectionMillis = millis();
     // Read the first line of the request
-    String request = client.readStringUntil('\r');
+    String request = client.readStringUntil('\r'); //need to read request until the end of the request first
     //Serial.println(request);
 
     while (client.available()) {
@@ -85,21 +86,23 @@ void loop() {
     // Close the connection
     client.stop();
     Serial.println("Client disconnected");
-    Serial.println("");
+    Serial.print("Live for ");
+    Serial.print(millis()/1000);
+    Serial.println("s");
     Serial.println(message);
 
-    // Convert String to char array
-    //char messageArray[message.length() + 1];
-    //message.toCharArray(messageArray, sizeof(messageArray));
-
-    //Insert new to here to send signal to arduino to prepare to receive a new message
-    message=message+"#END#";
+    if(message != ""){  //send message to arduino only if message is not empty
+      //Insert new to here to send signal to arduino to prepare to receive a new message
+      message=message+"#END#";
     
-    // Send message to Arduino UNO 
-    for (char c : message){
-      Wire.beginTransmission(9); // 9 is the address of the receiving Arduino
-      Wire.write(c);
-      Wire.endTransmission();
+      // Send message to Arduino UNO 
+      for (char c : message){
+        Wire.beginTransmission(9); // 9 is the address of the receiving Arduino
+        Wire.write(c);
+        Wire.endTransmission();
+      }
+      //message = "";
+        
     }    
   }
 }
